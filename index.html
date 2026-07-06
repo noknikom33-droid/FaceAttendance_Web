@@ -336,6 +336,16 @@
             <div class="row g-4">
                 <div class="col-md-6"><div class="custom-card p-4"><h6 class="fw-bold mb-3 text-danger">จัดการข้อมูลประวัติ</h6><button class="btn btn-outline-danger w-100" onclick="confirmClearHistory()">ล้างประวัติการเช็คชื่อทั้งหมด</button></div></div>
                 <div class="col-md-6"><div class="custom-card p-4"><h6 class="fw-bold mb-3">จัดการกิจกรรม</h6><div class="input-group mb-3"><input type="text" id="newAct" class="form-control shadow-none" placeholder="ชื่อกิจกรรม..."><button class="btn btn-primary" onclick="addActivity()">เพิ่ม</button></div><ul class="list-group list-group-flush" id="actList"></ul></div></div>
+                <div class="col-md-6">
+                    <div class="custom-card p-4">
+                        <h6 class="fw-bold mb-3"><i class="fas fa-volume-up me-2 text-primary"></i>เสียงแจ้งเตือนตอนเช็คชื่อ</h6>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" role="switch" id="soundToggle" onchange="toggleSound(this.checked)">
+                            <label class="form-check-label" for="soundToggle">พูดชื่อนักเรียนเมื่อเช็คชื่อสำเร็จ</label>
+                        </div>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="testVoice()"><i class="fas fa-play me-1"></i>ทดสอบเสียง</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -601,6 +611,43 @@
     const STABILIZATION_FRAMES = 5;
 
     let studentsDB = [], attendanceDB = [], activities = [];
+    let soundEnabled = (localStorage.getItem('faceCheckin_soundEnabled') ?? 'true') === 'true';
+
+    // ===== เสียงแจ้งเตือนเมื่อเช็คชื่อสำเร็จ (ใช้ Web Speech API ของเบราว์เซอร์ ไม่มีค่าใช้จ่าย) =====
+    function speakText(text) {
+        if (!soundEnabled) return;
+        if (!('speechSynthesis' in window)) {
+            console.warn('เบราว์เซอร์นี้ไม่รองรับการพูดข้อความ (SpeechSynthesis)');
+            return;
+        }
+        try {
+            speechSynthesis.cancel(); // ตัดเสียงเก่าที่ค้างอยู่ก่อน กันเสียงซ้อนกันตอนสแกนถี่ๆ
+            const utter = new SpeechSynthesisUtterance(text);
+            utter.lang = 'th-TH';
+            utter.rate = 1;
+            utter.pitch = 1;
+
+            // พยายามเลือกเสียงภาษาไทยถ้ามี ถ้าไม่มีให้ใช้เสียงเริ่มต้นของเบราว์เซอร์
+            const voices = speechSynthesis.getVoices();
+            const thVoice = voices.find(v => v.lang === 'th-TH' || v.lang.startsWith('th'));
+            if (thVoice) utter.voice = thVoice;
+
+            speechSynthesis.speak(utter);
+        } catch (e) {
+            console.warn('พูดข้อความไม่สำเร็จ:', e);
+        }
+    }
+
+    window.toggleSound = (checked) => {
+        soundEnabled = checked;
+        localStorage.setItem('faceCheckin_soundEnabled', checked ? 'true' : 'false');
+        if (checked) speakText('เปิดเสียงแจ้งเตือนแล้ว');
+    };
+
+    window.testVoice = () => {
+        speakText('ทดสอบเสียง เช็คชื่อเรียบร้อย');
+    };
+
     let isModelsLoaded = false, activeTab = 'scan', matcher = null, currentActivity = null;
     let sessionLog = new Set(), stabilizationMap = {}, currentStabId = null;
 
@@ -649,6 +696,8 @@
     window.onload = async () => {
         document.getElementById('repDate').valueAsDate = new Date();
         document.getElementById('repMonth').value = new Date().toISOString().slice(0, 7);
+        const soundToggleEl = document.getElementById('soundToggle');
+        if (soundToggleEl) soundToggleEl.checked = soundEnabled;
 
         // Safety Timeout
         setTimeout(() => {
@@ -1025,6 +1074,7 @@ async function startVideo(vidId, detect) {
         sessionLog.add(key);
         const s = studentsDB.find(x => x.id === sid); if(!s) return;
         showPopup(s.name, "เช็คชื่อสำเร็จ", "success");
+        speakText(`เช็คชื่อ ${s.name} เรียบร้อย`);
         const log = document.getElementById('liveLog');
         if(log.innerText.includes("ยังไม่มีรายการ")) log.innerHTML = "";
         const li = document.createElement('li');
