@@ -361,7 +361,20 @@
                 </div>
                 <div class="col-md-6">
                     <div class="custom-card p-4">
-                        <h6 class="fw-bold mb-3"><i class="fas fa-envelope me-2 text-danger"></i>แจ้งเตือนผู้ปกครองทางอีเมล</h6>
+                        <h6 class="fw-bold mb-3"><i class="fas fa-paper-plane me-2 text-success"></i>แจ้งเตือนผู้ปกครองอัตโนมัติ (มาถึงโรงเรียนแล้ว)</h6>
+                        <p class="small text-muted mb-3">พอนักเรียนสแกนใบหน้าเช็คชื่อสำเร็จ ระบบจะส่งอีเมลแจ้งผู้ปกครอง<b>ทันที</b>ว่าลูกมาถึงโรงเรียนแล้ว (ต้องมีอีเมลผู้ปกครองในทะเบียนนักเรียนก่อน)</p>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" role="switch" id="arrivalNotifyToggle" onchange="toggleArrivalNotify(this.checked)">
+                            <label class="form-check-label" for="arrivalNotifyToggle">เปิดใช้งานแจ้งเตือนอัตโนมัติ</label>
+                        </div>
+                        <div class="alert alert-warning small mb-0 py-2">
+                            <i class="fas fa-triangle-exclamation me-1"></i>บัญชี Gmail ทั่วไปส่งอีเมลได้ประมาณ 100 ฉบับ/วันเท่านั้น ถ้านักเรียนเยอะอาจส่งไม่ครบทุกคนในวันที่มาพร้อมกันมาก
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="custom-card p-4">
+                        <h6 class="fw-bold mb-3"><i class="fas fa-envelope me-2 text-danger"></i>แจ้งเตือนผู้ปกครองทางอีเมล (นักเรียนที่ขาด)</h6>
                         <p class="small text-muted mb-3">ส่งอีเมลแจ้งเตือนผู้ปกครองของนักเรียนที่ <b>ยังไม่ได้เช็คชื่อวันนี้</b> (ต้องกรอกอีเมลผู้ปกครองไว้ตอนลงทะเบียนนักเรียนก่อน)</p>
                         <div class="row g-2 mb-3">
                             <div class="col-6">
@@ -787,6 +800,8 @@
         callAPI('getSettings').then(d => {
             const input = document.getElementById('lateCutoffInput');
             if (input && d && d.lateCutoffTime) input.value = d.lateCutoffTime;
+            const arrivalToggle = document.getElementById('arrivalNotifyToggle');
+            if (arrivalToggle && d) arrivalToggle.checked = !!d.arrivalNotifyEnabled;
         }).catch(e => console.error('โหลดการตั้งค่าไม่สำเร็จ:', e));
     }
 
@@ -796,6 +811,15 @@
         callAPI('saveSettings', { settings: { lateCutoffTime: val } })
             .then(() => showPopup("บันทึกแล้ว", `เวลาตัดมาสาย: ${val} น.`, "success"))
             .catch(e => alert("บันทึกไม่สำเร็จ: " + e.message));
+    };
+
+    window.toggleArrivalNotify = (checked) => {
+        callAPI('saveSettings', { settings: { arrivalNotifyEnabled: checked } })
+            .then(() => showPopup(checked ? "เปิดใช้งานแล้ว" : "ปิดใช้งานแล้ว", "แจ้งเตือนอัตโนมัติเมื่อมาถึงโรงเรียน", "success"))
+            .catch(e => {
+                alert("บันทึกไม่สำเร็จ: " + e.message);
+                document.getElementById('arrivalNotifyToggle').checked = !checked; // revert ถ้าบันทึกไม่สำเร็จ
+            });
     };
 
     window.notifyAbsentParents = () => {
