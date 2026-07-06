@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบเช็คชื่อด้วยใบหน้า AI - By ครูเอ็มเม็มเต็ม</title>
+    <!-- CSS Frameworks -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+
+    <!-- Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --secondary-bg: #f3f4f6;
+            --card-bg: #ffffff;
+            --text-primary: #1f2937;
+            --accent-color: #6366f1;
+            --sidebar-width: 280px;
+        }
+
+        body { background-color: var(--secondary-bg); font-family: 'Sarabun', sans-serif; color: var(--text-primary); overflow-x: hidden; }
+        .main-wrapper { display: flex; min-height: 100vh; }
+
+        /* Sidebar Navigation */
+        .sidebar { width: var(--sidebar-width); background: var(--card-bg); border-right: 1px solid rgba(0,0,0,0.05); display: flex; flex-direction: column; position: fixed; height: 100vh; z-index: 100; transition: all 0.3s ease; }
+        .sidebar-header { padding: 2rem 1.5rem; text-align: center; border-bottom: 1px solid rgba(0,0,0,0.05); }
+        .logo-icon { width: 55px; height: 55px; background: var(--primary-gradient); border-radius: 14px; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.6rem; margin: 0 auto 0.8rem; box-shadow: 0 8px 20px rgba(118, 75, 162, 0.3); }
+        .nav-link { display: flex; align-items: center; padding: 0.9rem 1.5rem; color: #64748b; font-weight: 500; border-left: 4px solid transparent; transition: all 0.2s ease; margin: 0.2rem 0; cursor: pointer; text-decoration: none; }
+        .nav-link:hover { color: var(--accent-color); background: #f8fafc; }
+        .nav-link.active { color: var(--accent-color); background: #eff1ff; border-left-color: var(--accent-color); }
+        .nav-link i { width: 24px; margin-right: 12px; font-size: 1.1rem; }
+
+        .content-wrapper { flex: 1; margin-left: var(--sidebar-width); padding: 2.5rem; }
+        .custom-card { background: var(--card-bg); border-radius: 20px; border: none; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); margin-bottom: 1.5rem; }
+
+        /* Dashboard & Report Style */
+        .dash-card { border-radius: 20px; border: none; padding: 1.5rem; color: white; position: relative; overflow: hidden; height: 100%; transition: 0.3s; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
+        .bg-total { background: linear-gradient(135deg, #6366f1, #818cf8); }
+        .bg-present { background: linear-gradient(135deg, #10b981, #34d399); }
+        .bg-absent { background: linear-gradient(135deg, #ef4444, #f87171); }
+        .bg-percent { background: linear-gradient(135deg, #f59e0b, #fbbf24); }
+        .dash-card i { position: absolute; right: -10px; bottom: -10px; font-size: 5rem; opacity: 0.2; }
+
+        /* Video / Camera */
+        .video-container { position: relative; width: 100%; border-radius: 20px; overflow: hidden; background: #000; box-shadow: 0 15px 30px rgba(0,0,0,0.1); aspect-ratio: 4/3; }
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+
+        /* Export Area Specific */
+        #captureArea { background: white; padding: 30px; border-radius: 10px; }
+        .export-header { display: none; text-align: center; margin-bottom: 25px; border-bottom: 2px solid #333; padding-bottom: 15px; }
+        .is-exporting .export-header { display: block; }
+        .is-exporting .matrix-wrapper { max-height: none !important; overflow: visible !important; border: none !important; box-shadow: none !important; }
+        .is-exporting .table-matrix th, .is-exporting .table-matrix td { position: static !important; border: 1px solid #ddd !important; }
+
+        .loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.95); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .custom-popup { position: fixed; top: 30px; left: 50%; transform: translateX(-50%) translateY(-150%); background: white; padding: 0.8rem 1.5rem; border-radius: 50px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 1rem; z-index: 10000; transition: 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55); }
+        .custom-popup.show { transform: translateX(-50%) translateY(0); }
+        .status-pill { padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+
+        #stabOverlay { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10; display: none; }
+        .stab-bar { width: 180px; height: 8px; background: rgba(255,255,255,0.3); border-radius: 10px; overflow: hidden; }
+        .stab-progress { height: 100%; width: 0%; background: #10b981; transition: width 0.1s linear; }
+
+        .btn-action { width: 35px; height: 35px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; border: none; transition: 0.2s; }
+        .btn-record { background: #e0f2fe; color: #0369a1; } .btn-record:hover { background: #0369a1; color: white; }
+        .btn-del { background: #fee2e2; color: #b91c1c; } .btn-del:hover { background: #b91c1c; color: white; }
+
+        /* Matrix Table Styles */
+        .matrix-wrapper { max-height: 600px; overflow: auto; border-radius: 12px; box-shadow: 0 0 15px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; background: #fff; }
+        .table-matrix { border-collapse: separate; border-spacing: 0; width: 100%; }
+        .table-matrix thead th { position: sticky; top: 0; z-index: 20; background: #f8fafc; color: #64748b; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; padding: 12px 2px; border-bottom: 2px solid #e2e8f0; border-right: 1px solid #f1f5f9; text-align: center; }
+        .table-matrix tbody td { border-bottom: 1px solid #f1f5f9; border-right: 1px solid #f1f5f9; vertical-align: middle; padding: 8px 4px; font-size: 0.85rem; text-align: center; transition: all 0.1s; }
+        .table-matrix th:nth-child(1), .table-matrix td:nth-child(1) { position: sticky; left: 0; z-index: 25; background: #ffffff; border-right: 2px solid #e2e8f0; min-width: 60px; font-weight: 600; color: var(--accent-color); }
+        .table-matrix th:nth-child(2), .table-matrix td:nth-child(2) { position: sticky; left: 60px; z-index: 25; background: #ffffff; border-right: 2px solid #e2e8f0; min-width: 180px; text-align: left; padding-left: 15px; }
+        .table-matrix thead th:nth-child(1), .table-matrix thead th:nth-child(2) { z-index: 30; background: #f8fafc; }
+        .table-matrix tbody tr:hover td { background-color: #f8fafc; }
+        .table-matrix tbody tr:hover td:nth-child(1), .table-matrix tbody tr:hover td:nth-child(2) { background-color: #f1f5f9; }
+        .check-icon { color: #10b981; font-size: 1rem; filter: drop-shadow(0 2px 2px rgba(16, 185, 129, 0.15)); }
+        .absent-mark { color: #e2e8f0; font-size: 0.5rem; }
+        .col-summary { background-color: #fdf2f8 !important; font-weight: bold; color: #be185d; }
+        .col-summary-head { background-color: #fce7f3 !important; color: #be185d !important; }
+
+        /* Manual Style */
+        .manual-icon { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; background: #eff6ff; border-radius: 50%; color: #3b82f6; font-size: 1.5rem; margin-bottom: 1rem; }
+        .nav-tabs .nav-link { color: #6b7280; font-weight: 500; }
+        .nav-tabs .nav-link.active { color: #6366f1; font-weight: 700; border-bottom: 3px solid #6366f1; border-top: 0; border-left: 0; border-right: 0; }
+
+        /* Mockup Styles */
+        .mock-screen { border-radius: 10px; overflow: hidden; border: 1px solid #e0e0e0; box-shadow: 0 4px 10px rgba(0,0,0,0.05); background: #f8f9fa; }
+        .mock-header { background: #fff; padding: 8px 12px; border-bottom: 1px solid #eee; display: flex; align-items: center; justify-content: space-between; }
+        .mock-dots { display: flex; gap: 4px; } .mock-dot { width: 8px; height: 8px; rounded-circle; background: #e0e0e0; border-radius: 50%; }
+        .mock-body { padding: 15px; }
+
+        @media (max-width: 991px) {
+            .sidebar { width: 80px; } .sidebar-header h6, .sidebar span { display: none; }
+            .content-wrapper { margin-left: 80px; padding: 1.5rem; }
+            .nav-link { justify-content: center; } .nav-link i { margin: 0; font-size: 1.4rem; }
+            .table-matrix th:nth-child(2), .table-matrix td:nth-child(2) { min-width: 120px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="loadingScreen" class="loading-overlay">
+    <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;"></div>
+    <h5 class="fw-bold">กำลังประมวลผล...</h5>
+    <div id="loadingStatus" class="badge bg-light text-secondary fw-normal p-2 mt-2">Initializing AI Engine</div>
+</div>
+
+<div id="scanPopup" class="custom-popup">
+    <div id="popupIcon" class="p-2 rounded-circle bg-success text-white" style="width:35px; height:35px; display:flex; align-items:center; justify-content:center;"><i class="fas fa-check"></i></div>
+    <div><div class="fw-bold small" id="pMsg">สำเร็จ</div><div class="text-muted" style="font-size: 0.7rem;" id="pSub">เช็คชื่อเรียบร้อย</div></div>
+</div>
+
+<div class="main-wrapper">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo-icon"><i class="fas fa-user-shield"></i></div>
+            <h6 class="fw-bold mb-0">Face Check-in</h6>
+            <small class="text-muted">ระบบเช็คชื่อด้วยใบหน้า AI</small>
+        </div>
+        <nav class="nav flex-column mt-4 px-2">
+            <a class="nav-link active" onclick="switchTab('scan')"><i class="fas fa-camera"></i> <span>สแกนเข้าเรียน</span></a>
+            <a class="nav-link" onclick="switchTab('students')"><i class="fas fa-user-plus"></i> <span>ทะเบียนนักเรียน</span></a>
+            <a class="nav-link" onclick="switchTab('history')"><i class="fas fa-history"></i> <span>ประวัติรายบุคคล</span></a>
+            <a class="nav-link" onclick="switchTab('report')"><i class="fas fa-chart-pie"></i> <span>รายงาน & Dashboard</span></a>
+            <a class="nav-link" onclick="switchTab('settings')"><i class="fas fa-cog"></i> <span>ตั้งค่าระบบ</span></a>
+            <div class="border-top my-2 mx-3"></div>
+            <a class="nav-link text-primary" onclick="switchTab('manual')"><i class="fas fa-book"></i> <span>คู่มือการใช้งาน</span></a>
+        </nav>
+    </aside>
+
+    <main class="content-wrapper">
+        <!-- 1. Scan Section -->
+        <div id="scan-section" class="content-section">
+            <div class="d-flex align-items-center mb-4 animate__animated animate__fadeInLeft">
+                <div class="me-3 d-flex align-items-center justify-content-center bg-white rounded-circle shadow-sm" style="width: 60px; height: 60px;">
+                    <i class="fas fa-robot fa-2x text-primary"></i>
+                </div>
+                <div>
+                    <h3 class="fw-bold m-0" style="background: linear-gradient(45deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Smart Face Attendance</h3>
+                    <small class="text-secondary">Ready to scan...</small>
+                </div>
+            </div>
+            <div class="row g-4">
+                <div class="col-lg-8">
+                    <div class="custom-card p-4">
+                        <div class="d-flex align-items-center mb-4 gap-3 bg-light p-3 rounded-4">
+                            <div class="flex-grow-1">
+                                <label class="small text-muted mb-1 fw-bold">เลือกกิจกรรม:</label>
+                                <select id="activitySelect" class="form-select border-0 shadow-sm"></select>
+                            </div>
+                            <button id="btnStart" class="btn btn-primary px-4 rounded-3" onclick="startScanSession()">เริ่มแสกน</button>
+                            <button id="btnStop" class="btn btn-danger d-none px-4 rounded-3" onclick="stopScanSession()">หยุด</button>
+                        </div>
+                        <div class="video-container">
+                            <video id="scanVideo" autoplay muted playsinline></video>
+                            <div id="stabOverlay">
+                                <div class="text-white small text-center mb-1 fw-bold">รอยืนยันตัวตน...</div>
+                                <div class="stab-bar"><div id="stabProgress" class="stab-progress"></div></div>
+                            </div>
+                            <div id="videoPlaceholder" class="position-absolute top-50 start-50 translate-middle text-center text-white opacity-25"><i class="fas fa-video-slash fa-3x mb-2"></i><br>กล้องปิดอยู่</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="custom-card h-100">
+                        <div class="p-3 border-bottom d-flex justify-content-between"><h6 class="m-0 fw-bold">สแกนล่าสุดวันนี้</h6><span class="badge bg-primary rounded-pill" id="liveCount">0</span></div>
+                        <div class="overflow-auto" style="max-height:500px;"><ul class="list-group list-group-flush" id="liveLog"></ul></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Students Section -->
+        <div id="students-section" class="content-section d-none">
+            <h5 class="fw-bold mb-4" id="reg-title">ทะเบียนนักเรียน</h5>
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="custom-card p-4">
+                        <form id="regForm">
+                            <div class="mb-3"><label class="small fw-bold text-muted">รหัสนักเรียน</label><input type="text" id="regId" class="form-control shadow-none"></div>
+                            <div class="mb-3"><label class="small fw-bold text-muted">ชื่อ-นามสกุล</label><input type="text" id="regName" class="form-control shadow-none"></div>
+                            <div class="row g-2 mb-3"><div class="col"><label class="small fw-bold text-muted">ชั้น</label><input type="text" id="regClass" class="form-control shadow-none"></div><div class="col"><label class="small fw-bold text-muted">เลขที่</label><input type="number" id="regNo" class="form-control shadow-none"></div></div>
+                            <div class="video-container mb-3" style="height:200px;"><video id="regVideo" autoplay muted playsinline></video></div>
+                            <button id="btnSaveStudent" type="button" class="btn btn-primary w-100 py-2 fw-bold" onclick="registerStudent()">
+                                <span id="saveSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                                <span id="saveText">บันทึกใบหน้า</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <div class="custom-card h-100">
+                        <div class="p-3 border-bottom d-flex justify-content-between align-items-center"><h6 class="m-0 fw-bold">รายชื่อนักเรียน</h6><input type="text" class="form-control form-control-sm w-50 shadow-none border-0 bg-light" placeholder="ค้นหา..." onkeyup="filterStudentList(this.value)"></div>
+                        <div class="table-responsive" style="max-height:550px;"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th class="ps-3">รหัส</th><th>ชื่อ</th><th>ชั้น</th><th>เลขที่</th><th>จัดการ</th></tr></thead><tbody id="studentTableBody"></tbody></table></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. History Section -->
+        <div id="history-section" class="content-section d-none">
+            <h5 class="fw-bold mb-4">ประวัติรายบุคคล</h5>
+            <div class="custom-card mb-4 p-4"><div class="input-group"><span class="input-group-text bg-white border-end-0 ps-3"><i class="fas fa-search text-muted"></i></span><input type="text" class="form-control border-start-0 py-3 shadow-none" style="background:#f9fafb;" placeholder="ค้นหาประวัติ..." onkeyup="searchStudentHistory(this.value)"></div></div>
+            <div id="historyResults"><table class="table table-hover mb-0"><tbody id="historyTableBody"></tbody></table></div>
+        </div>
+
+        <!-- 4. Report Section & Dashboard -->
+        <div id="report-section" class="content-section d-none">
+            <h5 class="fw-bold mb-4">รายงานและ Dashboard สรุปผล</h5>
+
+            <div class="row g-4 mb-4">
+                <div class="col-md-3"><div class="dash-card bg-total"><h6>นักเรียนทั้งหมด</h6><h2 class="fw-bold" id="dashTotal">0</h2><small>คน</small><i class="fas fa-users"></i></div></div>
+                <div class="col-md-3"><div class="dash-card bg-present"><h6>มาเรียนวันนี้</h6><h2 class="fw-bold" id="dashPresent">0</h2><small>คน</small><i class="fas fa-user-check"></i></div></div>
+                <div class="col-md-3"><div class="dash-card bg-absent"><h6>ขาดเรียน</h6><h2 class="fw-bold" id="dashAbsent">0</h2><small>คน</small><i class="fas fa-user-times"></i></div></div>
+                <div class="col-md-3"><div class="dash-card bg-percent"><h6>อัตรามาเรียน</h6><h2 class="fw-bold" id="dashPercent">0%</h2><small>ความพร้อม</small><i class="fas fa-chart-line"></i></div></div>
+            </div>
+
+            <!-- Filters & Advanced Export -->
+            <div class="custom-card p-4">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-2">
+                        <label class="small fw-bold text-muted mb-1">ประเภท</label>
+                        <select id="reportType" class="form-select shadow-none" onchange="toggleReportType()">
+                            <option value="daily">รายวัน</option>
+                            <option value="monthly">รายเดือน</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="small fw-bold text-muted mb-1">ช่วงเวลา</label>
+                        <input type="date" id="repDate" class="form-control shadow-none" onchange="renderReport()">
+                        <input type="month" id="repMonth" class="form-control shadow-none d-none" onchange="renderReport()">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="small fw-bold text-muted mb-1">กิจกรรม</label>
+                        <select id="repAct" class="form-select shadow-none" onchange="renderReport()"></select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="small fw-bold text-muted mb-1">ห้องเรียน</label>
+                        <select id="repClass" class="form-select shadow-none" onchange="renderReport()"><option value="all">ทั้งโรงเรียน</option></select>
+                    </div>
+                    <div class="col-md-2 d-flex flex-wrap gap-2">
+                        <div class="dropdown w-100">
+                            <button class="btn btn-outline-secondary w-100 dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-download"></i> Export
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="#" onclick="exportToExcel()">Excel</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="exportReport('pdf')">PDF</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="exportReport('jpg')">Image (JPG)</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Export Area -->
+            <div id="exportWrapper" class="custom-card shadow-sm">
+                <div id="captureArea" style="background: white; padding: 40px; min-height: 700px;">
+                    <div class="export-header">
+                        <h3 class="fw-bold m-0">รายงานสรุปสารสนเทศการเข้าเรียน</h3>
+                        <p class="m-0 text-muted" id="exportSubHeader">ประจำวันที่ ... กิจกรรม ...</p>
+                    </div>
+
+                    <!-- Report Content Container -->
+                    <div id="reportContainer">
+                        <!-- Daily View -->
+                        <div id="dailyReportView">
+                            <div class="mb-5">
+                                <h6 class="fw-bold border-bottom pb-2 mb-3"><i class="fas fa-th-list me-2"></i> 1. สรุปยอดตามรายห้องเรียน</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered align-middle text-center" id="dailySummaryTable">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>ห้องเรียน</th>
+                                                <th>นักเรียนรวม (คน)</th>
+                                                <th class="text-success">มาเรียน (คน)</th>
+                                                <th class="text-danger">ขาดเรียน (คน)</th>
+                                                <th>ร้อยละการมาเรียน</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="summaryTableBody"></tbody>
+                                        <tfoot class="table-secondary fw-bold" id="summaryTableFoot"></tfoot>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h6 class="fw-bold border-bottom pb-2 mb-3"><i class="fas fa-user-tag me-2"></i> 2. รายละเอียดรายบุคคล</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-bordered align-middle mb-0" id="dailyDetailTable">
+                                        <thead class="table-dark">
+                                            <tr><th class="ps-3">รหัส</th><th>ชื่อ</th><th>ห้อง</th><th>เวลา</th><th>สถานะ</th></tr>
+                                        </thead>
+                                        <tbody id="reportTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Monthly View -->
+                        <div id="monthlyReportView" class="d-none">
+                            <h6 class="fw-bold border-bottom pb-2 mb-3"><i class="fas fa-calendar-alt me-2"></i> สรุปการมาเรียนรายเดือน (Matrix)</h6>
+                            <div class="matrix-wrapper">
+                                <table class="table-matrix" id="monthlyTable">
+                                    <thead id="monthlyThead"></thead>
+                                    <tbody id="monthlyTbody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="export-header mt-5" style="border-bottom: 0; border-top: 1px solid #eee; padding-top: 15px;">
+                        <p class="small text-muted">พิมพ์เมื่อ: <span id="printTimestamp"></span> | ระบบเช็คชื่อใบหน้า AI v5.0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. Settings Section -->
+        <div id="settings-section" class="content-section d-none">
+            <h5 class="fw-bold mb-4">ตั้งค่าระบบ</h5>
+            <div class="row g-4">
+                <div class="col-md-6"><div class="custom-card p-4"><h6 class="fw-bold mb-3 text-danger">จัดการข้อมูลประวัติ</h6><button class="btn btn-outline-danger w-100" onclick="confirmClearHistory()">ล้างประวัติการเช็คชื่อทั้งหมด</button></div></div>
+                <div class="col-md-6"><div class="custom-card p-4"><h6 class="fw-bold mb-3">จัดการกิจกรรม</h6><div class="input-group mb-3"><input type="text" id="newAct" class="form-control shadow-none" placeholder="ชื่อกิจกรรม..."><button class="btn btn-primary" onclick="addActivity()">เพิ่ม</button></div><ul class="list-group list-group-flush" id="actList"></ul></div></div>
+            </div>
+        </div>
+
+        <!-- 6. Manual Section -->
+        <div id="manual-section" class="content-section d-none">
+            <h5 class="fw-bold mb-4">คู่มือการใช้งานระบบ</h5>
+
+            <div class="custom-card">
+                <div class="card-header bg-white border-bottom-0 pt-4 px-4">
+                    <ul class="nav nav-tabs card-header-tabs" id="manualTabs" role="tablist">
+                        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#man-overview">ภาพรวม</a></li>
+                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#man-scan">1. สแกน</a></li>
+                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#man-reg">2. ทะเบียน</a></li>
+                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#man-report">4. รายงาน</a></li>
+                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#man-faq">ถาม-ตอบ</a></li>
+                    </ul>
+                </div>
+                <div class="card-body p-4 tab-content">
+
+                    <!-- Overview Tab -->
+                    <div class="tab-pane fade show active" id="man-overview">
+                        <div class="text-center py-4">
+                            <div class="d-inline-block p-3 rounded-circle bg-primary bg-opacity-10 text-primary mb-3">
+                                <i class="fas fa-user-shield fa-3x"></i>
+                            </div>
+                            <h4 class="fw-bold">Smart Face Attendance v5.0</h4>
+                            <p class="text-muted">ระบบเช็คชื่อนักเรียนด้วยเทคโนโลยีจดจำใบหน้า (Face Recognition)<br>ทำงานรวดเร็ว แม่นยำ และสรุปผลได้ทันที</p>
+                        </div>
+                        <div class="row g-4 mt-2">
+                            <div class="col-md-4">
+                                <div class="p-3 border rounded text-center h-100 bg-light">
+                                    <i class="fas fa-bolt text-warning fa-2x mb-2"></i>
+                                    <h6>รวดเร็ว</h6>
+                                    <small class="text-muted">สแกนและบันทึกผลทันที ไม่ต้องรอนาน</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 border rounded text-center h-100 bg-light">
+                                    <i class="fas fa-check-double text-success fa-2x mb-2"></i>
+                                    <h6>แม่นยำ</h6>
+                                    <small class="text-muted">มีระบบตรวจสอบหน้าซ้ำ ป้องกันข้อมูลผิดพลาด</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 border rounded text-center h-100 bg-light">
+                                    <i class="fas fa-file-export text-danger fa-2x mb-2"></i>
+                                    <h6>พร้อมใช้</h6>
+                                    <small class="text-muted">Export รายงานเป็น PDF และ Excel ได้ทันที</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Scan Tab -->
+                    <div class="tab-pane fade" id="man-scan">
+                        <h5 class="fw-bold text-primary mb-3">ขั้นตอนการสแกนเข้าเรียน</h5>
+                        <div class="list-group list-group-flush">
+                            <div class="list-group-item d-flex align-items-start py-3">
+                                <div class="bg-primary text-white rounded-circle px-2 me-3">1</div>
+                                <div><strong>เลือกกิจกรรม:</strong> เลือกกิจกรรมที่ต้องการเช็คชื่อจากเมนูด้านบน เช่น "เข้าแถวหน้าเสาธง"</div>
+                            </div>
+                            <div class="list-group-item d-flex align-items-start py-3">
+                                <div class="bg-primary text-white rounded-circle px-2 me-3">2</div>
+                                <div><strong>กด "เริ่มสแกน":</strong> กดปุ่มสีน้ำเงินเพื่อเปิดกล้อง (ต้องกดอนุญาตให้ใช้กล้องในครั้งแรก)</div>
+                            </div>
+                            <div class="list-group-item d-flex align-items-start py-3">
+                                <div class="bg-primary text-white rounded-circle px-2 me-3">3</div>
+                                <div><strong>ส่องใบหน้า:</strong> ให้นักเรียนหันหน้าเข้าหากล้อง
+                                    <ul class="small text-muted mt-1 ps-3">
+                                        <li><span class="text-success">กรอบสีเขียว:</span> จำหน้าได้ (ระบบจะบันทึกอัตโนมัติเมื่อมั่นใจ)</li>
+                                        <li><span class="text-danger">กรอบสีแดง:</span> ไม่รู้จัก หรือความมั่นใจต่ำ</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-3 p-3 bg-dark rounded-3 text-center position-relative overflow-hidden" style="height: 250px;">
+                            <div class="position-absolute top-0 start-0 w-100 h-100 bg-secondary opacity-25"></div>
+                            <i class="fas fa-user fa-5x text-white position-absolute top-50 start-50 translate-middle opacity-50"></i>
+                            <div class="position-absolute top-50 start-50 translate-middle border border-success border-4 rounded" style="width: 120px; height: 120px;"></div>
+                            <div class="position-absolute bottom-0 start-0 w-100 p-2 bg-success text-white small fw-bold">
+                                <i class="fas fa-check-circle"></i> จำใบหน้าได้: เด็กชายสมชาย (98%)
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Register Tab -->
+                    <div class="tab-pane fade" id="man-reg">
+                        <h5 class="fw-bold text-primary mb-3">การเพิ่มข้อมูลนักเรียน</h5>
+                        <ol class="list-group list-group-numbered">
+                            <li class="list-group-item"><strong>กรอกข้อมูล:</strong> ใส่รหัสนักเรียน (สำคัญ), ชื่อ-นามสกุล, ชั้น และเลขที่</li>
+                            <li class="list-group-item"><strong>ถ่ายภาพ:</strong> ให้นักเรียนมองกล้องนิ่งๆ ควรถอดหน้ากาก/แว่นตา</li>
+                            <li class="list-group-item"><strong>บันทึก:</strong> กดปุ่ม "บันทึกใบหน้า" ระบบจะตรวจสอบว่าหน้าซ้ำกับคนอื่นหรือไม่</li>
+                        </ol>
+                        <div class="alert alert-info mt-3 d-flex align-items-center">
+                            <i class="fas fa-info-circle fa-2x me-3"></i>
+                            <div>
+                                <strong>เคล็ดลับ:</strong> หากต้องการอัปเดตหน้าเดิม ให้ใช้ <u>รหัสนักเรียนเดิม</u> แล้วกดบันทึกทับได้เลย
+                            </div>
+                        </div>
+                        <div class="mt-3 p-3 bg-white border rounded shadow-sm">
+                            <div class="mb-2">
+                                <label class="small text-muted">รหัสนักเรียน</label>
+                                <input type="text" class="form-control form-control-sm" value="12345" disabled>
+                            </div>
+                            <div class="mb-2">
+                                <label class="small text-muted">ชื่อ-นามสกุล</label>
+                                <input type="text" class="form-control form-control-sm" value="ด.ช. รักเรียน" disabled>
+                            </div>
+                            <div class="bg-light border rounded text-center py-4 text-muted">
+                                <i class="fas fa-camera fa-2x mb-2"></i><br>
+                                <small>ภาพใบหน้า</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Report Tab -->
+                    <div class="tab-pane fade" id="man-report">
+                        <h5 class="fw-bold text-primary mb-3">การดูรายงานและ Export</h5>
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <div class="card h-100 border-0 shadow-sm bg-light">
+                                    <div class="card-body">
+                                        <h6><i class="fas fa-calendar-day text-primary"></i> รายงานรายวัน (Daily)</h6>
+                                        <p class="small text-muted">ดูรายละเอียดว่าวันนี้ใครมาเวลากี่โมง เหมาะสำหรับเช็คประจำวัน</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card h-100 border-0 shadow-sm bg-light">
+                                    <div class="card-body">
+                                        <h6><i class="fas fa-calendar-alt text-primary"></i> รายงานรายเดือน (Monthly)</h6>
+                                        <p class="small text-muted">ดูตารางสรุปทั้งเดือน (Matrix) แยกรายวัน 1-31 เหมาะสำหรับสรุปผลส่งวิชาการ</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <h6 class="mt-4 fw-bold">รูปแบบไฟล์ที่รองรับ</h6>
+                        <ul>
+                            <li><strong>Excel:</strong> ไฟล์สเปรดชีต แยก Sheet สรุป/รายละเอียด</li>
+                            <li><strong>PDF:</strong> เอกสารพร้อมพิมพ์ (ตัดหน้ากระดาษอัตโนมัติ)</li>
+                            <li><strong>JPG:</strong> รูปภาพสำหรับส่งทางไลน์</li>
+                        </ul>
+                        <div class="mt-3">
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <div class="p-2 rounded text-white bg-primary bg-gradient">
+                                        <small>ทั้งหมด</small>
+                                        <div class="h5 mb-0">120</div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="p-2 rounded text-white bg-success bg-gradient">
+                                        <small>มาเรียน</small>
+                                        <div class="h5 mb-0">118</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-2 p-2 border rounded bg-white">
+                                <div class="d-flex justify-content-between border-bottom pb-1 mb-1">
+                                    <small class="fw-bold">ประวัติล่าสุด</small>
+                                    <small class="text-muted">10:00 น.</small>
+                                </div>
+                                <div class="small text-muted">
+                                    <i class="fas fa-check-circle text-success"></i> ด.ช. สมชาย ใจดี
+                                </div>
+                                <div class="small text-muted">
+                                    <i class="fas fa-check-circle text-success"></i> ด.ญ. สมหญิง รักเรียน
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- FAQ Tab -->
+                    <div class="tab-pane fade" id="man-faq">
+                        <div class="accordion accordion-flush" id="faqAccordion">
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+                                        Q: สแกนแล้วไม่ติด หรือขึ้นกรอบแดงตลอด?
+                                    </button>
+                                </h2>
+                                <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                    <div class="accordion-body text-muted">A: แสงสว่างอาจไม่พอ หรือใบหน้าเปลี่ยนไปมาก แนะนำให้ไปที่เมนู "ทะเบียนนักเรียน" แล้วบันทึกใบหน้าทับด้วยรหัสเดิมเพื่ออัปเดตหน้าใหม่</div>
+                                </div>
+                            </div>
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                                        Q: ใช้บน iPhone/iPad ได้ไหม?
+                                    </button>
+                                </h2>
+                                <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                    <div class="accordion-body text-muted">A: ได้ครับ ผ่าน Safari หรือ Chrome แต่ต้องกดอนุญาตให้เว็บไซต์เข้าถึงกล้องก่อนในครั้งแรก</div>
+                                </div>
+                            </div>
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+                                        Q: ข้อมูลรายเดือนไม่ขึ้น?
+                                    </button>
+                                </h2>
+                                <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                    <div class="accordion-body text-muted">A: ตรวจสอบว่าเลือก "เดือน/ปี" ถูกต้อง และในเดือนนั้นมีการสแกนจริง หรือลองกด Refresh หน้าเว็บหนึ่งครั้ง</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-4 text-center text-muted small">
+                            Developed by ครูเอ็ม เม็มเต็ม และ Gemini
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<div class="modal fade" id="histModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-body p-0">
+                <div class="p-4" style="background: var(--primary-gradient); color: white;"><div class="d-flex align-items-center"><div class="bg-white bg-opacity-25 p-3 rounded-circle me-3"><i class="fas fa-id-badge fa-2x"></i></div><div><h4 class="fw-bold mb-0" id="mName">-</h4><small class="opacity-75">รหัส: <span id="mId">-</span> | ชั้น: <span id="mClass">-</span></small></div><button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button></div></div>
+                <div class="p-4"><div class="table-responsive rounded-3 border"><table class="table table-hover mb-0"><thead class="table-light"><tr><th>วันที่</th><th>เวลา</th><th>กิจกรรม</th></tr></thead><tbody id="mTableBody"></tbody></table></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // ============ API CONFIG ============
+    // URL ของ Google Apps Script Web App (deploy เป็น "Anyone" ให้เข้าถึงได้)
+    const API_URL = "https://script.google.com/macros/s/AKfycbw68moQ_1FVCEe4ti39qzb1UB_0gjl7t8MfwGdWP-msTRN4QW1yQD93wFp8pSmHRZH2/exec";
+
+    /**
+     * เรียก API ของ Apps Script
+     * ใช้ Content-Type: text/plain เพื่อเลี่ยง CORS preflight (OPTIONS)
+     * ซึ่ง Apps Script ไม่รองรับ
+     */
+    function callAPI(action, params = {}) {
+        return fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action, params })
+        })
+        .then(r => {
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            return r.json();
+        })
+        .then(res => {
+            if (!res.success) throw new Error(res.error || 'Unknown API error');
+            return res.data;
+        });
+    }
+
+    const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+    const MATCH_THRESHOLD = 0.40; // High Accuracy
+    const STABILIZATION_FRAMES = 5;
+
+    let studentsDB = [], attendanceDB = [], activities = [];
+    let isModelsLoaded = false, activeTab = 'scan', matcher = null, currentActivity = null;
+    let sessionLog = new Set(), stabilizationMap = {}, currentStabId = null;
+
+    window.onload = async () => {
+        document.getElementById('repDate').valueAsDate = new Date();
+        document.getElementById('repMonth').value = new Date().toISOString().slice(0, 7);
+
+        // Safety Timeout
+        setTimeout(() => {
+            const ls = document.getElementById('loadingScreen');
+            if(ls && ls.style.display !== 'none') {
+                ls.style.display = 'none';
+                console.warn("Loading timed out.");
+                showPopup("แจ้งเตือน", "การโหลดล่าช้า ระบบอาจทำงานไม่สมบูรณ์", "warning");
+            }
+        }, 15000);
+
+        if (typeof faceapi === 'undefined') {
+            document.getElementById('loadingStatus').innerText = "AI Load Failed.";
+            console.error("FaceAPI error.");
+            syncData();
+            return;
+        }
+
+        try {
+            document.getElementById('loadingStatus').innerText = "Loading AI Models...";
+            await Promise.all([
+                faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+                faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+            ]);
+            isModelsLoaded = true;
+            syncData();
+        } catch(e) {
+            console.error(e);
+            document.getElementById('loadingStatus').innerText = "Model Load Failed";
+            syncData();
+        }
+    };
+
+    function showPopup(msg, sub, type = 'success') {
+        const p = document.getElementById('scanPopup');
+        document.getElementById('pMsg').innerText = msg;
+        document.getElementById('pSub').innerText = sub;
+        const icon = document.getElementById('popupIcon');
+        icon.className = `p-2 rounded-circle bg-${type} text-white`;
+        p.classList.add('show');
+        setTimeout(() => p.classList.remove('show'), 3000);
+    }
+
+    async function syncData() {
+        let done = 0;
+        const check = () => { if(++done >= 3) { document.getElementById('loadingScreen').style.display = 'none'; updateMatcher(); renderReport(); } };
+        const handleErr = (e) => {
+            console.error(e);
+            showPopup("เชื่อมต่อไม่ได้", e.message || "ตรวจสอบการ deploy ของ Apps Script", "danger");
+            check();
+        };
+
+        callAPI('getAllStudents').then(d => { studentsDB = d || []; renderStudentTable(); check(); }).catch(handleErr);
+        callAPI('getActivities').then(d => { activities = d || []; renderActivityOptions(); renderActivityList(); check(); }).catch(handleErr);
+        callAPI('getAttendanceHistory').then(d => { attendanceDB = d || []; check(); }).catch(handleErr);
+    }
+
+    function updateMatcher() {
+        if (!isModelsLoaded) return;
+        const valid = studentsDB.filter(s => s.descriptor);
+        matcher = valid.length > 0 ? new faceapi.FaceMatcher(valid.map(s => new faceapi.LabeledFaceDescriptors(s.id, [new Float32Array(s.descriptor)])), MATCH_THRESHOLD) : null;
+    }
+
+    function switchTab(t) {
+        activeTab = t;
+        document.querySelectorAll('.content-section').forEach(s => s.classList.add('d-none'));
+
+        const sec = document.getElementById(t + '-section');
+        if(sec) sec.classList.remove('d-none');
+
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        const link = document.querySelector(`.nav-link[onclick*='${t}']`);
+        if(link) link.classList.add('active');
+
+        stopVideo();
+        if(t === 'students') startVideo('regVideo', true);
+        if(t === 'report') renderReport();
+    }
+
+    function renderStudentTable(f = "") {
+        const tbody = document.getElementById('studentTableBody');
+        const term = f.toLowerCase();
+        const filtered = studentsDB.filter(s => String(s.id).includes(term) || String(s.name).toLowerCase().includes(term));
+        tbody.innerHTML = filtered.map(s => `
+            <tr><td class="ps-3 fw-bold text-primary">${s.id}</td><td>${s.name} <br> <span class="status-pill bg-${s.hasFace?'success':'danger'} bg-opacity-10 text-${s.hasFace?'success':'danger'}">${s.hasFace?'มีหน้า':'รอถ่าย'}</span></td>
+            <td>${s.sClass || '-'}</td><td>${s.sNo || '-'}</td>
+            <td><button class="btn-action btn-record me-1 shadow-sm" onclick="prepareRecord('${s.id}')"><i class="fas fa-camera"></i></button><button class="btn-action btn-del shadow-sm" onclick="confirmDelete('${s.id}', '${s.name}')"><i class="fas fa-trash"></i></button></td></tr>
+        `).join('') || '<tr><td colspan="5" class="text-center py-4">ไม่พบข้อมูล</td></tr>';
+    }
+
+    window.filterStudentList = (v) => renderStudentTable(v);
+
+    window.prepareRecord = (id) => {
+        const s = studentsDB.find(x => x.id === id);
+        if(s) {
+            document.getElementById('regId').value = s.id; document.getElementById('regName').value = s.name;
+            document.getElementById('regClass').value = s.sClass || ""; document.getElementById('regNo').value = s.sNo || "";
+            document.getElementById('reg-title').scrollIntoView({ behavior: 'smooth' });
+        }
+    };
+
+    window.confirmDelete = (id, name) => {
+        if(confirm(`ยืนยันการลบนักเรียน ${name}?`)) {
+            callAPI('deleteStudent', { studentId: id })
+                .then(() => syncData())
+                .catch(e => alert("ลบไม่สำเร็จ: " + e.message));
+        }
+    };
+
+    async function registerStudent() {
+        if(!isModelsLoaded) return alert("ระบบ AI ยังไม่พร้อมใช้งาน");
+
+        const btn = document.getElementById('btnSaveStudent');
+        const spinner = document.getElementById('saveSpinner');
+        const txt = document.getElementById('saveText');
+        const id = document.getElementById('regId').value.trim();
+        const name = document.getElementById('regName').value.trim();
+        const v = document.getElementById('regVideo');
+
+        btn.disabled = true; spinner.classList.remove('d-none'); txt.innerText = "กำลังตรวจสอบ...";
+
+        try {
+            if(!id || !name) throw new Error("กรุณาระบุรหัสและชื่อนักเรียน");
+
+            const det = await faceapi.detectSingleFace(v, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }))
+                                     .withFaceLandmarks()
+                                     .withFaceDescriptor();
+
+            if(!det) throw new Error("ไม่พบใบหน้า กรุณาขยับให้เห็นหน้าชัดเจน");
+
+            const DUPLICATE_THRESHOLD = 0.45;
+            const currentDesc = det.descriptor;
+
+            for (const student of studentsDB) {
+                if (String(student.id) === String(id)) continue;
+                if (student.descriptor) {
+                    const storedDesc = new Float32Array(student.descriptor);
+                    const distance = faceapi.euclideanDistance(currentDesc, storedDesc);
+                    if (distance < DUPLICATE_THRESHOLD) {
+                       throw new Error(`ใบหน้านี้ซ้ำกับ: ${student.name} (รหัส: ${student.id}) \nกรุณาตรวจสอบอีกครั้ง`);
+                    }
+                }
+            }
+
+            txt.innerText = "กำลังบันทึก...";
+
+            const res = await callAPI('saveStudentData', {
+                student: { id, name, sClass: document.getElementById('regClass').value, sNo: document.getElementById('regNo').value, descriptor: Array.from(det.descriptor) }
+            });
+            alert(res.message);
+            if(res.success) { syncData(); document.getElementById('regForm').reset(); }
+
+        } catch(e) {
+            alert("เกิดข้อผิดพลาด: " + e.message);
+        } finally {
+            btn.disabled = false; spinner.classList.add('d-none'); txt.innerText = "บันทึกใบหน้า";
+        }
+    }
+
+async function startVideo(vidId, detect) {
+    const v = document.getElementById(vidId);
+    if (!v) return;
+
+    try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error("เบราว์เซอร์นี้ไม่รองรับการใช้กล้อง กรุณาใช้ Chrome หรือ Edge");
+        }
+
+        if (navigator.permissions) {
+            try {
+                const permResult = await navigator.permissions.query({ name: 'camera' });
+                console.log('Camera permission state:', permResult.state);
+                if (permResult.state === 'denied') {
+                    throw new Error("กล้องถูกบล็อก กรุณาไปที่ Settings ของเบราว์เซอร์แล้วอนุญาตกล้องสำหรับเว็บไซต์นี้");
+                }
+            } catch (pe) {
+                console.log('Permission query not supported:', pe);
+            }
+        }
+
+        const constraints = {
+            video: {
+                width: { ideal: 640, max: 1280 },
+                height: { ideal: 480, max: 720 },
+                facingMode: 'user'
+            },
+            audio: false
+        };
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        v.srcObject = stream;
+        v.setAttribute('playsinline', '');
+        v.setAttribute('webkit-playsinline', '');
+        v.muted = true;
+
+        try {
+            await v.play();
+        } catch (playErr) {
+            console.warn("Autoplay blocked, trying muted play:", playErr);
+            v.muted = true;
+            await v.play();
+        }
+
+        const placeholder = document.getElementById('videoPlaceholder');
+        if (placeholder) placeholder.classList.add('d-none');
+
+        if (detect && isModelsLoaded) {
+            v.addEventListener('play', () => {
+                const oldCanvas = v.parentElement.querySelector('canvas');
+                if (oldCanvas) oldCanvas.remove();
+
+                const canvas = faceapi.createCanvasFromMedia(v);
+                v.parentElement.append(canvas);
+
+                const size = { width: v.clientWidth, height: v.clientHeight };
+                faceapi.matchDimensions(canvas, size);
+
+                let isProcessing = false;
+
+                const itv = setInterval(async () => {
+                    if (v.paused || v.ended || (activeTab !== 'scan' && activeTab !== 'students')) {
+                        clearInterval(itv);
+                        return;
+                    }
+
+                    if (isProcessing) return;
+                    isProcessing = true;
+
+                    try {
+                        const options = new faceapi.TinyFaceDetectorOptions({
+                            inputSize: 224,
+                            scoreThreshold: 0.5
+                        });
+
+                        const dets = await faceapi
+                            .detectAllFaces(v, options)
+                            .withFaceLandmarks()
+                            .withFaceDescriptors();
+
+                        const resized = faceapi.resizeResults(dets, size);
+                        const ctx = canvas.getContext('2d');
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                        let currentIds = [];
+
+                        resized.forEach(d => {
+                            let label = 'Unknown';
+                            let boxColor = '#ef4444';
+                            let matchScore = 0;
+
+                            if (matcher) {
+                                const res = matcher.findBestMatch(d.descriptor);
+                                matchScore = Math.round((1 - res.distance) * 100);
+
+                                if (res.label !== 'unknown') {
+                                    const student = studentsDB.find(x => x.id === res.label);
+                                    label = student ? `${student.name} (${matchScore}%)` : 'Unknown';
+
+                                    if (activeTab === 'scan') {
+                                        currentIds.push(res.label);
+                                        handleStab(res.label);
+                                    }
+                                    boxColor = res.distance < MATCH_THRESHOLD ? '#10b981' : '#f59e0b';
+                                } else {
+                                    label = `Unknown (${matchScore}%)`;
+                                }
+                            }
+
+                            const box = d.detection.box;
+                            const mBox = new faceapi.Box({
+                                x: size.width - box.x - box.width,
+                                y: box.y,
+                                width: box.width,
+                                height: box.height
+                            });
+
+                            new faceapi.draw.DrawBox(mBox, { label, boxColor }).draw(canvas);
+                        });
+
+                        if (activeTab === 'scan' && currentIds.length === 0) {
+                            currentStabId = null;
+                            document.getElementById('stabOverlay').style.display = 'none';
+                        }
+
+                    } catch (frameErr) {
+                        console.log("Frame processing skip:", frameErr);
+                    } finally {
+                        isProcessing = false;
+                    }
+
+                }, 200);
+            }, { once: true });
+        }
+
+    } catch (e) {
+        console.error("Camera error:", e);
+
+        let msg = "เกิดข้อผิดพลาด: " + e.message;
+        if (e.name === 'NotAllowedError') {
+            msg = "❌ ไม่ได้รับอนุญาตให้ใช้กล้อง\nกรุณากด Allow เมื่อเบราว์เซอร์ถาม\nหรือไปที่ 🔒 (ไอคอนล็อค) ในแถบ URL แล้วเปิดสิทธิ์กล้อง";
+        } else if (e.name === 'NotFoundError') {
+            msg = "❌ ไม่พบกล้อง กรุณาเชื่อมต่อกล้องแล้วลองใหม่";
+        } else if (e.name === 'NotReadableError') {
+            msg = "❌ กล้องถูกใช้งานโดยโปรแกรมอื่นอยู่ กรุณาปิดโปรแกรมอื่นแล้วลองใหม่";
+        }
+
+        showPopup("กล้องมีปัญหา", msg.split('\n')[0], "danger");
+        alert(msg);
+    }
+}
+
+    function handleStab(id) {
+        if(currentStabId !== id) { currentStabId = id; stabilizationMap[id] = 1; }
+        else { stabilizationMap[id]++; }
+        const overlay = document.getElementById('stabOverlay'), bar = document.getElementById('stabProgress');
+        overlay.style.display = 'block';
+        const progress = (stabilizationMap[id] / STABILIZATION_FRAMES) * 100;
+        bar.style.width = Math.min(progress, 100) + '%';
+        if(stabilizationMap[id] >= STABILIZATION_FRAMES) { processAttendance(id); stabilizationMap[id] = -50; overlay.style.display = 'none'; }
+    }
+
+    function processAttendance(sid) {
+        if(!currentActivity) return;
+        const dStr = new Date().toLocaleDateString('th-TH'), key = sid + "_" + currentActivity + "_" + dStr;
+        if(attendanceDB.some(a => a.id === sid && a.activity === currentActivity && a.date.includes(new Date().getDate())) || sessionLog.has(key)) {
+            if(!sessionLog.has(key)) showPopup("แจ้งเตือน", "แสกนกิจกรรมนี้ไปแล้ว", "warning"); sessionLog.add(key); return;
+        }
+        sessionLog.add(key);
+        const s = studentsDB.find(x => x.id === sid); if(!s) return;
+        showPopup(s.name, "เช็คชื่อสำเร็จ", "success");
+        const log = document.getElementById('liveLog');
+        if(log.innerText.includes("ยังไม่มีรายการ")) log.innerHTML = "";
+        const li = document.createElement('li');
+        li.className = "list-group-item d-flex justify-content-between align-items-center animate__animated animate__fadeIn";
+        li.innerHTML = `<div><div class="fw-bold small">${s.name}</div><small class="text-muted">${new Date().toLocaleTimeString()}</small></div><i class="fas fa-check-circle text-success"></i>`;
+        log.prepend(li);
+
+        callAPI('recordAttendance', { record: { id: s.id, name: s.name, sClass: s.sClass, activity: currentActivity } })
+            .then(res => { attendanceDB.push(res); renderReport(); })
+            .catch(e => console.error(e));
+    }
+
+    function toggleReportType() {
+        const type = document.getElementById('reportType').value;
+        if (type === 'daily') {
+            document.getElementById('repDate').classList.remove('d-none');
+            document.getElementById('repMonth').classList.add('d-none');
+            document.getElementById('dailyReportView').classList.remove('d-none');
+            document.getElementById('monthlyReportView').classList.add('d-none');
+        } else {
+            document.getElementById('repDate').classList.add('d-none');
+            document.getElementById('repMonth').classList.remove('d-none');
+            document.getElementById('dailyReportView').classList.add('d-none');
+            document.getElementById('monthlyReportView').classList.remove('d-none');
+        }
+        renderReport();
+    }
+
+    function renderReport() {
+        const type = document.getElementById('reportType').value;
+        const act = document.getElementById('repAct').value;
+        const cls = document.getElementById('repClass').value;
+
+        if (type === 'daily') {
+            const dateVal = document.getElementById('repDate').value; if(!dateVal) return;
+            const [y, m, d] = dateVal.split('-'), dFormatted = `${d}/${m}/${y}`;
+            document.getElementById('exportSubHeader').innerText = `ประจำวันที่ ${dFormatted} | กิจกรรม: ${act === 'all' ? 'ทุกกิจกรรม' : act}`;
+
+            callAPI('getDashboardData', { filterDate: dFormatted, filterActivity: act, filterClass: cls })
+                .then(data => {
+                    document.getElementById('dashTotal').innerText = data.summary.total;
+                    document.getElementById('dashPresent').innerText = data.summary.present;
+                    document.getElementById('dashAbsent').innerText = data.summary.absent;
+                    document.getElementById('dashPercent').innerText = data.summary.percent + '%';
+
+                    const cSel = document.getElementById('repClass'), current = cSel.value;
+                    cSel.innerHTML = '<option value="all">ทั้งโรงเรียน</option>';
+                    if(data.classes) data.classes.forEach(c => cSel.add(new Option(c, c)));
+                    cSel.value = current;
+
+                    document.getElementById('reportTableBody').innerHTML = data.details.map(i => `
+                        <tr><td class="ps-3 small"><b>${i.id}</b></td><td class="small">${i.name}</td><td class="small">${i.sClass}</td><td class="small">${i.time}</td>
+                        <td><span class="status-pill bg-${i.status==='มาเรียน'?'success':'danger'} bg-opacity-10 text-${i.status==='มาเรียน'?'success':'danger'}">${i.status}</span></td></tr>
+                    `).join('') || '<tr><td colspan="5" class="text-center py-4">ไม่พบข้อมูล</td></tr>';
+
+                    generateSummaryTable(data.details);
+                })
+                .catch(e => alert("ดึงข้อมูล Dashboard ไม่สำเร็จ: " + e.message));
+
+        } else {
+            const monthVal = document.getElementById('repMonth').value;
+            if(!monthVal) return;
+            document.getElementById('exportSubHeader').innerText = `ประจำเดือน ${monthVal} | กิจกรรม: ${act === 'all' ? 'ทุกกิจกรรม' : act}`;
+            document.getElementById('loadingScreen').style.display = 'flex';
+
+            callAPI('getMonthlyReportData', { monthStr: monthVal, filterClass: cls, filterActivity: act })
+                .then(data => {
+                    document.getElementById('loadingScreen').style.display = 'none';
+                    if(data.error) return alert("Error: " + data.error);
+                    renderMonthlyTable(data);
+                })
+                .catch(err => {
+                    document.getElementById('loadingScreen').style.display = 'none';
+                    alert("การประมวลผลล้มเหลว: " + err.message);
+                });
+        }
+    }
+
+    function renderMonthlyTable(data) {
+        let headHtml = `<tr><th>รหัส</th><th>ชื่อ-นามสกุล</th>`;
+        for(let i=1; i<=data.daysInMonth; i++) { headHtml += `<th>${i}</th>`; }
+        headHtml += `<th class="col-summary-head">รวม</th><th class="col-summary-head">%</th></tr>`;
+        document.getElementById('monthlyThead').innerHTML = headHtml;
+
+        let bodyHtml = "", totalP = 0, totalStudents = data.data.length;
+        data.data.forEach(s => {
+            totalP += s.summary.present;
+            let row = `<tr><td>${s.id}</td><td>${s.name}</td>`;
+            s.daily.forEach(status => {
+                const content = status === '✔'
+                    ? `<i class="fas fa-check-circle check-icon"></i>`
+                    : `<i class="fas fa-circle absent-mark"></i>`;
+                row += `<td>${content}</td>`;
+            });
+            row += `<td class="col-summary">${s.summary.present}</td><td class="col-summary">${s.summary.percent}%</td></tr>`;
+            bodyHtml += row;
+        });
+        document.getElementById('monthlyTbody').innerHTML = bodyHtml || '<tr><td colspan="100%">ไม่พบข้อมูล</td></tr>';
+
+        document.getElementById('dashTotal').innerText = totalStudents;
+        document.getElementById('dashPresent').innerText = totalP;
+        document.getElementById('dashAbsent').innerText = "-";
+        document.getElementById('dashPercent').innerText = "-";
+    }
+
+    function generateSummaryTable(details) {
+        const rooms = {};
+        details.forEach(item => {
+            const r = item.sClass || "ไม่ระบุ";
+            if(!rooms[r]) rooms[r] = { total: 0, present: 0, absent: 0 };
+            rooms[r].total++;
+            if(item.status === 'มาเรียน') rooms[r].present++;
+            else rooms[r].absent++;
+        });
+
+        let html = "", totalAll = 0, totalPresent = 0, totalAbsent = 0;
+        Object.keys(rooms).sort().forEach(roomName => {
+            const data = rooms[roomName];
+            const percent = data.total > 0 ? ((data.present / data.total) * 100).toFixed(1) : 0;
+            totalAll += data.total; totalPresent += data.present; totalAbsent += data.absent;
+            html += `<tr><td><b>${roomName}</b></td><td>${data.total}</td><td class="text-success">${data.present}</td><td class="text-danger">${data.absent}</td><td>${percent}%</td></tr>`;
+        });
+        document.getElementById('summaryTableBody').innerHTML = html || '<tr><td colspan="5">ไม่มีข้อมูลสรุป</td></tr>';
+        document.getElementById('summaryTableFoot').innerHTML = `<tr><td>รวมทั้งหมด</td><td>${totalAll}</td><td>${totalPresent}</td><td>${totalAbsent}</td><td>${totalAll > 0 ? ((totalPresent/totalAll)*100).toFixed(1) : 0}%</td></tr>`;
+    }
+
+    window.exportToExcel = () => {
+        const type = document.getElementById('reportType').value;
+        const wb = XLSX.utils.book_new();
+        const dateStr = document.getElementById('repDate').value || document.getElementById('repMonth').value;
+
+        if (type === 'daily') {
+            const sumTable = document.getElementById('dailySummaryTable');
+            const sumWs = XLSX.utils.table_to_sheet(sumTable);
+            XLSX.utils.book_append_sheet(wb, sumWs, "สรุปยอด");
+
+            const detTable = document.getElementById('dailyDetailTable');
+            const detWs = XLSX.utils.table_to_sheet(detTable);
+            XLSX.utils.book_append_sheet(wb, detWs, "รายละเอียด");
+        } else {
+            const matrixTable = document.getElementById('monthlyTable');
+            const ws = XLSX.utils.table_to_sheet(matrixTable);
+            XLSX.utils.book_append_sheet(wb, ws, "Matrix");
+        }
+        XLSX.writeFile(wb, `Report_${type}_${dateStr}.xlsx`);
+    };
+
+    async function exportReport(format) {
+        const captureArea = document.getElementById('captureArea');
+        const matrixWrappers = document.querySelectorAll('.matrix-wrapper');
+        const originalStyles = [];
+        matrixWrappers.forEach(el => {
+            originalStyles.push({ maxHeight: el.style.maxHeight, overflow: el.style.overflow });
+            el.style.maxHeight = 'none'; el.style.overflow = 'visible';
+        });
+
+        document.body.classList.add('is-exporting');
+        document.getElementById('printTimestamp').innerText = new Date().toLocaleString('th-TH');
+        document.getElementById('loadingScreen').style.display = 'flex';
+        document.getElementById('loadingStatus').innerText = `กำลังสร้างไฟล์ ${format.toUpperCase()}...`;
+
+        try {
+            const canvas = await html2canvas(captureArea, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+            if(format === 'jpg') {
+                const link = document.createElement('a');
+                link.download = `Report_${document.getElementById('repDate').value}.jpg`;
+                link.href = canvas.toDataURL("image/jpeg", 0.9);
+                link.click();
+            } else if(format === 'pdf') {
+                const { jsPDF } = window.jspdf;
+                const isMonthly = document.getElementById('reportType').value === 'monthly';
+                const orientation = isMonthly ? 'l' : 'p';
+
+                const pdf = new jsPDF(orientation, 'mm', 'a4');
+                const imgData = canvas.toDataURL("image/png");
+                const imgProps = pdf.getImageProperties(imgData);
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                const pageHeight = pdf.internal.pageSize.getHeight();
+
+                let heightLeft = pdfHeight;
+                let position = 0;
+
+                pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+                heightLeft -= pageHeight;
+
+                while (heightLeft >= 0) {
+                  position = heightLeft - pdfHeight;
+                  pdf.addPage();
+                  pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+                  heightLeft -= pageHeight;
+                }
+                pdf.save(`Report_${document.getElementById('repDate').value}.pdf`);
+            }
+        } catch (e) { alert("เกิดข้อผิดพลาดในการส่งออก"); }
+        finally {
+            matrixWrappers.forEach((el, i) => { el.style.maxHeight = originalStyles[i].maxHeight; el.style.overflow = originalStyles[i].overflow; });
+            document.body.classList.remove('is-exporting');
+            document.getElementById('loadingScreen').style.display = 'none';
+        }
+    }
+
+    window.startScanSession = () => {
+        const val = document.getElementById('activitySelect').value; if(!val) return alert("เลือกกิจกรรม");
+        currentActivity = val; document.getElementById('btnStart').classList.add('d-none');
+        document.getElementById('btnStop').classList.remove('d-none'); document.getElementById('videoPlaceholder').classList.add('d-none');
+        startVideo('scanVideo', true);
+    };
+
+    window.stopScanSession = () => { stopVideo(); currentActivity = null; document.getElementById('btnStart').classList.remove('d-none'); document.getElementById('btnStop').classList.add('d-none'); document.getElementById('videoPlaceholder').classList.remove('d-none'); };
+
+    function stopVideo() { document.querySelectorAll('video').forEach(v => { if(v.srcObject) v.srcObject.getTracks().forEach(t => t.stop()); }); document.querySelectorAll('canvas').forEach(c => c.remove()); }
+
+    function renderActivityOptions() {
+        const s = document.getElementById('activitySelect'), s2 = document.getElementById('repAct');
+        s.innerHTML = '<option value="" disabled selected>-- เลือกกิจกรรม --</option>';
+        s2.innerHTML = '<option value="all">ทุกกิจกรรม</option>';
+        activities.forEach(a => { s.add(new Option(a, a)); s2.add(new Option(a, a)); });
+    }
+
+    function renderActivityList() { document.getElementById('actList').innerHTML = activities.map((a, i) => `<li class="list-group-item d-flex justify-content-between align-items-center small border-0 border-bottom">${a} <button class="btn btn-sm text-danger" onclick="delAct(${i})"><i class="fas fa-trash-alt"></i></button></li>`).join(''); }
+
+    window.addActivity = () => {
+        const v = document.getElementById('newAct').value.trim();
+        if(v) {
+            activities.push(v);
+            document.getElementById('newAct').value = "";
+            callAPI('saveAllActivities', { list: activities }).then(syncData).catch(e => alert(e.message));
+        }
+    };
+
+    window.delAct = (i) => {
+        if(confirm("ลบ?")) {
+            activities.splice(i, 1);
+            callAPI('saveAllActivities', { list: activities }).then(syncData).catch(e => alert(e.message));
+        }
+    };
+
+    window.searchStudentHistory = (val) => {
+        const t = val.toLowerCase(); if(t.length < 2) return;
+        const res = studentsDB.filter(s => String(s.id).includes(t) || String(s.name).toLowerCase().includes(t));
+        document.getElementById('historyTableBody').innerHTML = res.map(s => `<tr><td class="ps-3"><b>${s.id}</b></td><td>${s.name}</td><td class="text-end pe-3"><button class="btn btn-outline-primary btn-sm rounded-pill px-3 shadow-sm" onclick="viewHistory('${s.id}')">ดูประวัติ</button></td></tr>`).join('') || '<tr><td>ไม่พบข้อมูล</td></tr>';
+    }
+
+    window.viewHistory = (sid) => {
+        const s = studentsDB.find(x => x.id === sid); if(!s) return;
+        const hist = attendanceDB.filter(h => h.id === sid);
+        document.getElementById('mName').innerText = s.name; document.getElementById('mId').innerText = s.id; document.getElementById('mClass').innerText = s.sClass || '-';
+        document.getElementById('mTableBody').innerHTML = hist.map(h => `<tr><td>${h.date}</td><td>${h.time}</td><td>${h.activity}</td></tr>`).join('') || '<tr><td colspan="3">ไม่มีข้อมูล</td></tr>';
+        new bootstrap.Modal(document.getElementById('histModal')).show();
+    }
+
+    window.confirmClearHistory = () => {
+        if(confirm("ล้างประวัติ?") && prompt("พิมพ์ CONFIRM:") === "CONFIRM") {
+            callAPI('clearAttendanceHistory').then(() => syncData()).catch(e => alert(e.message));
+        }
+    };
+</script>
+</body>
+</html>
