@@ -1165,7 +1165,22 @@ async function startVideo(vidId, detect) {
         log.prepend(li);
 
         callAPI('recordAttendance', { record: { id: s.id, name: s.name, sClass: s.sClass, activity: currentActivity } })
-            .then(res => { attendanceDB.push(res); renderReport(); })
+            .then(res => {
+                attendanceDB.push(res);
+                renderReport();
+
+                // แจ้งสถานะอีเมลผู้ปกครองให้เห็นชัดๆ บนหน้าจอ (แทนที่จะเงียบแล้วไม่รู้สาเหตุ)
+                if (res.mailStatus === 'sent') {
+                    console.log(`ส่งอีเมลแจ้งผู้ปกครองสำเร็จ: ${res.mailDetail}`);
+                } else if (res.mailStatus === 'no_email') {
+                    console.warn(`ไม่ได้ส่งอีเมล (${s.name}): ${res.mailDetail}`);
+                } else if (res.mailStatus === 'quota_exceeded') {
+                    showPopup("แจ้งเตือน", `อีเมลผู้ปกครอง: ${res.mailDetail}`, "warning");
+                } else if (res.mailStatus === 'error') {
+                    showPopup("ส่งอีเมลไม่สำเร็จ", res.mailDetail || "เกิดข้อผิดพลาด", "danger");
+                    console.error(`ส่งอีเมลผู้ปกครองไม่สำเร็จ (${s.name}): ${res.mailDetail}`);
+                }
+            })
             .catch(e => console.error(e));
     }
 
