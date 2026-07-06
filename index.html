@@ -194,6 +194,7 @@
                             <div class="mb-3"><label class="small fw-bold text-muted">รหัสนักเรียน</label><input type="text" id="regId" class="form-control shadow-none"></div>
                             <div class="mb-3"><label class="small fw-bold text-muted">ชื่อ-นามสกุล</label><input type="text" id="regName" class="form-control shadow-none"></div>
                             <div class="row g-2 mb-3"><div class="col"><label class="small fw-bold text-muted">ชั้น</label><input type="text" id="regClass" class="form-control shadow-none"></div><div class="col"><label class="small fw-bold text-muted">เลขที่</label><input type="number" id="regNo" class="form-control shadow-none"></div></div>
+                            <div class="mb-3"><label class="small fw-bold text-muted">อีเมลผู้ปกครอง <span class="text-muted fw-normal">(ถ้ามี ใช้แจ้งเตือนกรณีขาดเรียน)</span></label><input type="email" id="regParentEmail" class="form-control shadow-none" placeholder="parent@example.com"></div>
                             <div class="video-container mb-3" style="height:200px;"><video id="regVideo" autoplay muted playsinline></video></div>
                             <button id="btnSaveStudent" type="button" class="btn btn-primary w-100 py-2 fw-bold" onclick="registerStudent()">
                                 <span id="saveSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
@@ -222,11 +223,12 @@
         <div id="report-section" class="content-section d-none">
             <h5 class="fw-bold mb-4">รายงานและ Dashboard สรุปผล</h5>
 
-            <div class="row g-4 mb-4">
-                <div class="col-md-3"><div class="dash-card bg-total"><h6>นักเรียนทั้งหมด</h6><h2 class="fw-bold" id="dashTotal">0</h2><small>คน</small><i class="fas fa-users"></i></div></div>
-                <div class="col-md-3"><div class="dash-card bg-present"><h6>มาเรียนวันนี้</h6><h2 class="fw-bold" id="dashPresent">0</h2><small>คน</small><i class="fas fa-user-check"></i></div></div>
-                <div class="col-md-3"><div class="dash-card bg-absent"><h6>ขาดเรียน</h6><h2 class="fw-bold" id="dashAbsent">0</h2><small>คน</small><i class="fas fa-user-times"></i></div></div>
-                <div class="col-md-3"><div class="dash-card bg-percent"><h6>อัตรามาเรียน</h6><h2 class="fw-bold" id="dashPercent">0%</h2><small>ความพร้อม</small><i class="fas fa-chart-line"></i></div></div>
+            <div class="row g-4 mb-4 row-cols-2 row-cols-md-5">
+                <div class="col"><div class="dash-card bg-total"><h6>นักเรียนทั้งหมด</h6><h2 class="fw-bold" id="dashTotal">0</h2><small>คน</small><i class="fas fa-users"></i></div></div>
+                <div class="col"><div class="dash-card bg-present"><h6>มาเรียนวันนี้</h6><h2 class="fw-bold" id="dashPresent">0</h2><small>คน</small><i class="fas fa-user-check"></i></div></div>
+                <div class="col"><div class="dash-card" style="background: linear-gradient(135deg, #f97316, #fb923c);"><h6>มาสาย</h6><h2 class="fw-bold" id="dashLate">0</h2><small>คน</small><i class="fas fa-user-clock"></i></div></div>
+                <div class="col"><div class="dash-card bg-absent"><h6>ขาดเรียน</h6><h2 class="fw-bold" id="dashAbsent">0</h2><small>คน</small><i class="fas fa-user-times"></i></div></div>
+                <div class="col"><div class="dash-card bg-percent"><h6>อัตรามาเรียน</h6><h2 class="fw-bold" id="dashPercent">0%</h2><small>ความพร้อม</small><i class="fas fa-chart-line"></i></div></div>
             </div>
 
             <!-- Filters & Advanced Export -->
@@ -288,6 +290,7 @@
                                                 <th>ห้องเรียน</th>
                                                 <th>นักเรียนรวม (คน)</th>
                                                 <th class="text-success">มาเรียน (คน)</th>
+                                                <th class="text-warning">มาสาย (คน)</th>
                                                 <th class="text-danger">ขาดเรียน (คน)</th>
                                                 <th>ร้อยละการมาเรียน</th>
                                             </tr>
@@ -344,6 +347,33 @@
                             <label class="form-check-label" for="soundToggle">พูดชื่อนักเรียนเมื่อเช็คชื่อสำเร็จ</label>
                         </div>
                         <button class="btn btn-outline-secondary btn-sm" onclick="testVoice()"><i class="fas fa-play me-1"></i>ทดสอบเสียง</button>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="custom-card p-4">
+                        <h6 class="fw-bold mb-3"><i class="fas fa-clock me-2 text-warning"></i>เวลาตัดมาสาย</h6>
+                        <p class="small text-muted mb-2">เช็คชื่อหลังเวลานี้ ระบบจะบันทึกสถานะเป็น "มาสาย" แทน "มาเรียน" โดยอัตโนมัติ</p>
+                        <div class="input-group">
+                            <input type="time" id="lateCutoffInput" class="form-control shadow-none">
+                            <button class="btn btn-primary" onclick="saveLateCutoff()">บันทึก</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="custom-card p-4">
+                        <h6 class="fw-bold mb-3"><i class="fas fa-envelope me-2 text-danger"></i>แจ้งเตือนผู้ปกครองทางอีเมล</h6>
+                        <p class="small text-muted mb-3">ส่งอีเมลแจ้งเตือนผู้ปกครองของนักเรียนที่ <b>ยังไม่ได้เช็คชื่อวันนี้</b> (ต้องกรอกอีเมลผู้ปกครองไว้ตอนลงทะเบียนนักเรียนก่อน)</p>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="small fw-bold text-muted">กิจกรรม</label>
+                                <select id="notifyActSelect" class="form-select form-select-sm shadow-none"></select>
+                            </div>
+                            <div class="col-6">
+                                <label class="small fw-bold text-muted">ห้องเรียน</label>
+                                <select id="notifyClassSelect" class="form-select form-select-sm shadow-none"><option value="all">ทั้งโรงเรียน</option></select>
+                            </div>
+                        </div>
+                        <button class="btn btn-danger w-100" onclick="notifyAbsentParents()"><i class="fas fa-paper-plane me-1"></i>ส่งแจ้งเตือนผู้ปกครอง (นักเรียนที่ขาดวันนี้)</button>
                     </div>
                 </div>
             </div>
@@ -751,10 +781,37 @@
             check();
         };
 
-        callAPI('getAllStudents').then(d => { studentsDB = d || []; renderStudentTable(); check(); }).catch(handleErr);
+        callAPI('getAllStudents').then(d => { studentsDB = d || []; renderStudentTable(); renderActivityOptions(); check(); }).catch(handleErr);
         callAPI('getActivities').then(d => { activities = d || []; renderActivityOptions(); renderActivityList(); check(); }).catch(handleErr);
         callAPI('getAttendanceHistory').then(d => { attendanceDB = d || []; check(); }).catch(handleErr);
+        callAPI('getSettings').then(d => {
+            const input = document.getElementById('lateCutoffInput');
+            if (input && d && d.lateCutoffTime) input.value = d.lateCutoffTime;
+        }).catch(e => console.error('โหลดการตั้งค่าไม่สำเร็จ:', e));
     }
+
+    window.saveLateCutoff = () => {
+        const val = document.getElementById('lateCutoffInput').value;
+        if (!val) return alert("กรุณาเลือกเวลาก่อน");
+        callAPI('saveSettings', { settings: { lateCutoffTime: val } })
+            .then(() => showPopup("บันทึกแล้ว", `เวลาตัดมาสาย: ${val} น.`, "success"))
+            .catch(e => alert("บันทึกไม่สำเร็จ: " + e.message));
+    };
+
+    window.notifyAbsentParents = () => {
+        const act = document.getElementById('notifyActSelect').value;
+        const cls = document.getElementById('notifyClassSelect').value;
+        if (!confirm(`ยืนยันส่งอีเมลแจ้งเตือนผู้ปกครองของนักเรียนที่ยังไม่เช็คชื่อวันนี้ (กิจกรรม: ${act === 'all' ? 'ทุกกิจกรรม' : act})?`)) return;
+
+        callAPI('notifyAbsentParents', { activity: act, filterClass: cls })
+            .then(res => {
+                if (res.error) return alert("เกิดข้อผิดพลาด: " + res.error);
+                let msg = `นักเรียนที่ขาด ${res.absentCount} คน\nส่งอีเมลสำเร็จ ${res.sent} ฉบับ`;
+                if (res.noEmail > 0) msg += `\nข้าม ${res.noEmail} คน (ไม่มีอีเมลผู้ปกครอง หรือส่งไม่สำเร็จ)`;
+                alert(msg);
+            })
+            .catch(e => alert("ส่งแจ้งเตือนไม่สำเร็จ: " + e.message));
+    };
 
     function updateMatcher() {
         if (!isModelsLoaded) return;
@@ -801,6 +858,7 @@
         if(s) {
             document.getElementById('regId').value = s.id; document.getElementById('regName').value = s.name;
             document.getElementById('regClass').value = s.sClass || ""; document.getElementById('regNo').value = s.sNo || "";
+            document.getElementById('regParentEmail').value = s.parentEmail || "";
             document.getElementById('reg-title').scrollIntoView({ behavior: 'smooth' });
         }
     };
@@ -851,7 +909,7 @@
             txt.innerText = "กำลังบันทึก...";
 
             const res = await callAPI('saveStudentData', {
-                student: { id, name, sClass: document.getElementById('regClass').value, sNo: document.getElementById('regNo').value, descriptor: Array.from(det.descriptor) }
+                student: { id, name, sClass: document.getElementById('regClass').value, sNo: document.getElementById('regNo').value, parentEmail: document.getElementById('regParentEmail').value.trim(), descriptor: Array.from(det.descriptor) }
             });
             alert(res.message);
             if(res.success) { syncData(); document.getElementById('regForm').reset(); }
@@ -1117,6 +1175,7 @@ async function startVideo(vidId, detect) {
                 .then(data => {
                     document.getElementById('dashTotal').innerText = data.summary.total;
                     document.getElementById('dashPresent').innerText = data.summary.present;
+                    document.getElementById('dashLate').innerText = data.summary.late;
                     document.getElementById('dashAbsent').innerText = data.summary.absent;
                     document.getElementById('dashPercent').innerText = data.summary.percent + '%';
 
@@ -1125,9 +1184,10 @@ async function startVideo(vidId, detect) {
                     if(data.classes) data.classes.forEach(c => cSel.add(new Option(c, c)));
                     cSel.value = current;
 
+                    const statusStyle = (st) => st === 'มาเรียน' ? 'success' : (st === 'มาสาย' ? 'warning' : 'danger');
                     document.getElementById('reportTableBody').innerHTML = data.details.map(i => `
                         <tr><td class="ps-3 small"><b>${i.id}</b></td><td class="small">${i.name}</td><td class="small">${i.sClass}</td><td class="small">${i.time}</td>
-                        <td><span class="status-pill bg-${i.status==='มาเรียน'?'success':'danger'} bg-opacity-10 text-${i.status==='มาเรียน'?'success':'danger'}">${i.status}</span></td></tr>
+                        <td><span class="status-pill bg-${statusStyle(i.status)} bg-opacity-10 text-${statusStyle(i.status)}">${i.status}</span></td></tr>
                     `).join('') || '<tr><td colspan="5" class="text-center py-4">ไม่พบข้อมูล</td></tr>';
 
                     generateSummaryTable(data.details);
@@ -1176,6 +1236,7 @@ async function startVideo(vidId, detect) {
 
         document.getElementById('dashTotal').innerText = totalStudents;
         document.getElementById('dashPresent').innerText = totalP;
+        document.getElementById('dashLate').innerText = "-";
         document.getElementById('dashAbsent').innerText = "-";
         document.getElementById('dashPercent').innerText = "-";
     }
@@ -1184,21 +1245,22 @@ async function startVideo(vidId, detect) {
         const rooms = {};
         details.forEach(item => {
             const r = item.sClass || "ไม่ระบุ";
-            if(!rooms[r]) rooms[r] = { total: 0, present: 0, absent: 0 };
+            if(!rooms[r]) rooms[r] = { total: 0, present: 0, late: 0, absent: 0 };
             rooms[r].total++;
             if(item.status === 'มาเรียน') rooms[r].present++;
+            else if(item.status === 'มาสาย') rooms[r].late++;
             else rooms[r].absent++;
         });
 
-        let html = "", totalAll = 0, totalPresent = 0, totalAbsent = 0;
+        let html = "", totalAll = 0, totalPresent = 0, totalLate = 0, totalAbsent = 0;
         Object.keys(rooms).sort().forEach(roomName => {
             const data = rooms[roomName];
-            const percent = data.total > 0 ? ((data.present / data.total) * 100).toFixed(1) : 0;
-            totalAll += data.total; totalPresent += data.present; totalAbsent += data.absent;
-            html += `<tr><td><b>${roomName}</b></td><td>${data.total}</td><td class="text-success">${data.present}</td><td class="text-danger">${data.absent}</td><td>${percent}%</td></tr>`;
+            const percent = data.total > 0 ? (((data.present + data.late) / data.total) * 100).toFixed(1) : 0;
+            totalAll += data.total; totalPresent += data.present; totalLate += data.late; totalAbsent += data.absent;
+            html += `<tr><td><b>${roomName}</b></td><td>${data.total}</td><td class="text-success">${data.present}</td><td class="text-warning">${data.late}</td><td class="text-danger">${data.absent}</td><td>${percent}%</td></tr>`;
         });
-        document.getElementById('summaryTableBody').innerHTML = html || '<tr><td colspan="5">ไม่มีข้อมูลสรุป</td></tr>';
-        document.getElementById('summaryTableFoot').innerHTML = `<tr><td>รวมทั้งหมด</td><td>${totalAll}</td><td>${totalPresent}</td><td>${totalAbsent}</td><td>${totalAll > 0 ? ((totalPresent/totalAll)*100).toFixed(1) : 0}%</td></tr>`;
+        document.getElementById('summaryTableBody').innerHTML = html || '<tr><td colspan="6">ไม่มีข้อมูลสรุป</td></tr>';
+        document.getElementById('summaryTableFoot').innerHTML = `<tr><td>รวมทั้งหมด</td><td>${totalAll}</td><td>${totalPresent}</td><td>${totalLate}</td><td>${totalAbsent}</td><td>${totalAll > 0 ? (((totalPresent+totalLate)/totalAll)*100).toFixed(1) : 0}%</td></tr>`;
     }
 
     window.exportToExcel = () => {
@@ -1290,9 +1352,24 @@ async function startVideo(vidId, detect) {
 
     function renderActivityOptions() {
         const s = document.getElementById('activitySelect'), s2 = document.getElementById('repAct');
+        const s3 = document.getElementById('notifyActSelect');
         s.innerHTML = '<option value="" disabled selected>-- เลือกกิจกรรม --</option>';
         s2.innerHTML = '<option value="all">ทุกกิจกรรม</option>';
-        activities.forEach(a => { s.add(new Option(a, a)); s2.add(new Option(a, a)); });
+        if (s3) s3.innerHTML = '<option value="all">ทุกกิจกรรม</option>';
+        activities.forEach(a => {
+            s.add(new Option(a, a));
+            s2.add(new Option(a, a));
+            if (s3) s3.add(new Option(a, a));
+        });
+
+        const s4 = document.getElementById('notifyClassSelect');
+        if (s4) {
+            const currentVal = s4.value;
+            s4.innerHTML = '<option value="all">ทั้งโรงเรียน</option>';
+            const classList = [...new Set(studentsDB.map(st => st.sClass))].filter(c => c).sort();
+            classList.forEach(c => s4.add(new Option(c, c)));
+            s4.value = currentVal || 'all';
+        }
     }
 
     function renderActivityList() { document.getElementById('actList').innerHTML = activities.map((a, i) => `<li class="list-group-item d-flex justify-content-between align-items-center small border-0 border-bottom">${a} <button class="btn btn-sm text-danger" onclick="delAct(${i})"><i class="fas fa-trash-alt"></i></button></li>`).join(''); }
@@ -1335,4 +1412,3 @@ async function startVideo(vidId, detect) {
 </script>
 </body>
 </html>
-<!-- update -->
