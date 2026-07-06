@@ -1008,8 +1008,18 @@ async function startVideo(vidId, detect) {
 
     function processAttendance(sid) {
         if(!currentActivity) return;
-        const dStr = new Date().toLocaleDateString('th-TH'), key = sid + "_" + currentActivity + "_" + dStr;
-        if(attendanceDB.some(a => a.id === sid && a.activity === currentActivity && a.date.includes(new Date().getDate())) || sessionLog.has(key)) {
+        const now = new Date();
+        // สร้างวันที่รูปแบบ dd/MM/yyyy ให้ตรงกับรูปแบบที่ฝั่ง Apps Script บันทึกไว้ (Asia/Bangkok)
+        const pad = n => String(n).padStart(2, '0');
+        const todayStr = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`;
+        const key = sid + "_" + currentActivity + "_" + todayStr;
+
+        // เดิมใช้ a.date.includes(now.getDate()) ซึ่งเป็นบั๊ก เพราะ .includes() แปลงตัวเลขวันเป็นสตริงแล้วเช็คว่า
+        // เป็น "ส่วนหนึ่ง" ของวันที่ (เช่น เลข 6 จะไปแมตช์กับ "06/07/2026" ที่มีเลข 6 ปนอยู่แทบทุกครั้ง)
+        // ทำให้ระบบเข้าใจผิดว่าเช็คชื่อไปแล้ว ทั้งที่จริงยังไม่เคยเช็คชื่อวันนี้เลย แก้เป็นเทียบวันที่แบบตรงตัวทั้งสตริง
+        const alreadyChecked = attendanceDB.some(a => a.id === sid && a.activity === currentActivity && a.date === todayStr);
+
+        if(alreadyChecked || sessionLog.has(key)) {
             if(!sessionLog.has(key)) showPopup("แจ้งเตือน", "แสกนกิจกรรมนี้ไปแล้ว", "warning"); sessionLog.add(key); return;
         }
         sessionLog.add(key);
