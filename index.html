@@ -808,7 +808,8 @@ async function startVideo(vidId, detect) {
         if (placeholder) placeholder.classList.add('d-none');
 
         if (detect && isModelsLoaded) {
-            v.addEventListener('play', () => {
+            // เรียกทันทีหลัง play() สำเร็จ (ไม่ใช้ event 'play' เพราะ event มักยิงไปแล้วก่อนที่จะผูก listener ทัน ทำให้ canvas ไม่เคยถูกสร้าง)
+            const setupFaceDetection = () => {
                 const oldCanvas = v.parentElement.querySelector('canvas');
                 if (oldCanvas) oldCanvas.remove();
 
@@ -892,7 +893,10 @@ async function startVideo(vidId, detect) {
                     }
 
                 }, 200);
-            }, { once: true });
+            };
+
+            // เผื่อ browser บางตัวยังไม่ได้อัปเดต clientWidth/clientHeight ทันที ให้รอ requestAnimationFrame 1 รอบก่อน
+            requestAnimationFrame(() => setupFaceDetection());
         }
 
     } catch (e) {
@@ -1191,4 +1195,3 @@ async function startVideo(vidId, detect) {
 </script>
 </body>
 </html>
-<!-- update -->
