@@ -149,6 +149,9 @@
                 <div>
                     <h3 class="fw-bold m-0" style="background: linear-gradient(45deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Smart Face Attendance</h3>
                     <small class="text-secondary">Ready to scan...</small>
+                    <div id="aiStatusBadge" class="badge bg-warning-subtle text-warning-emphasis mt-1" style="display:block; width:fit-content;">
+                        <i class="fas fa-spinner fa-spin"></i> กำลังโหลด AI...
+                    </div>
                 </div>
             </div>
             <div class="row g-4">
@@ -589,13 +592,59 @@
         });
     }
 
-    const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+    // ลอง CDN หลักก่อน ถ้าโหลดไม่ทันเวลาหรือ error จะสลับไป CDN สำรองอัตโนมัติ
+    const MODEL_URLS = [
+        'https://justadudewhohacks.github.io/face-api.js/models',
+        'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights'
+    ];
     const MATCH_THRESHOLD = 0.40; // High Accuracy
     const STABILIZATION_FRAMES = 5;
 
     let studentsDB = [], attendanceDB = [], activities = [];
     let isModelsLoaded = false, activeTab = 'scan', matcher = null, currentActivity = null;
     let sessionLog = new Set(), stabilizationMap = {}, currentStabId = null;
+
+    function setAiStatus(state, text) {
+        const badge = document.getElementById('aiStatusBadge');
+        if (!badge) return;
+        const styles = {
+            loading: { cls: 'bg-warning-subtle text-warning-emphasis', icon: 'fa-spinner fa-spin' },
+            ready:   { cls: 'bg-success-subtle text-success-emphasis', icon: 'fa-check-circle' },
+            error:   { cls: 'bg-danger-subtle text-danger-emphasis', icon: 'fa-triangle-exclamation' }
+        };
+        const s = styles[state] || styles.loading;
+        badge.className = 'badge ' + s.cls + ' mt-1';
+        badge.style.display = 'block';
+        badge.style.width = 'fit-content';
+        badge.innerHTML = `<i class="fas ${s.icon}"></i> ${text}`;
+    }
+
+    function withTimeout(promise, ms, label) {
+        return Promise.race([
+            promise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error(`โหลด ${label} เกินเวลา (${ms/1000}s)`)), ms))
+        ]);
+    }
+
+    async function loadFaceModels() {
+        let lastError = null;
+        for (let i = 0; i < MODEL_URLS.length; i++) {
+            const url = MODEL_URLS[i];
+            try {
+                setAiStatus('loading', `กำลังโหลด AI (แหล่งที่ ${i + 1}/${MODEL_URLS.length})...`);
+                await withTimeout(Promise.all([
+                    faceapi.nets.tinyFaceDetector.loadFromUri(url),
+                    faceapi.nets.faceLandmark68Net.loadFromUri(url),
+                    faceapi.nets.faceRecognitionNet.loadFromUri(url)
+                ]), 20000, 'AI models');
+                return true; // สำเร็จ
+            } catch (e) {
+                console.error(`โหลดโมเดลจาก ${url} ไม่สำเร็จ:`, e);
+                lastError = e;
+            }
+        }
+        throw lastError || new Error('ไม่สามารถโหลดโมเดล AI ได้จากทุกแหล่ง');
+    }
 
     window.onload = async () => {
         document.getElementById('repDate').valueAsDate = new Date();
@@ -609,27 +658,27 @@
                 console.warn("Loading timed out.");
                 showPopup("แจ้งเตือน", "การโหลดล่าช้า ระบบอาจทำงานไม่สมบูรณ์", "warning");
             }
-        }, 15000);
+        }, 25000);
 
         if (typeof faceapi === 'undefined') {
             document.getElementById('loadingStatus').innerText = "AI Load Failed.";
-            console.error("FaceAPI error.");
+            setAiStatus('error', 'โหลดไลบรารี face-api.js ไม่สำเร็จ (เช็คอินเทอร์เน็ต/ตัวบล็อกโฆษณา)');
+            console.error("FaceAPI library not found.");
             syncData();
             return;
         }
 
         try {
             document.getElementById('loadingStatus').innerText = "Loading AI Models...";
-            await Promise.all([
-                faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-                faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-                faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
-            ]);
+            await loadFaceModels();
             isModelsLoaded = true;
+            setAiStatus('ready', 'AI พร้อมใช้งาน');
             syncData();
         } catch(e) {
-            console.error(e);
+            console.error("Model load failed completely:", e);
             document.getElementById('loadingStatus').innerText = "Model Load Failed";
+            setAiStatus('error', 'โหลด AI ไม่สำเร็จ: ' + e.message);
+            showPopup("โหลด AI ไม่สำเร็จ", e.message, "danger");
             syncData();
         }
     };
@@ -662,6 +711,11 @@
         if (!isModelsLoaded) return;
         const valid = studentsDB.filter(s => s.descriptor);
         matcher = valid.length > 0 ? new faceapi.FaceMatcher(valid.map(s => new faceapi.LabeledFaceDescriptors(s.id, [new Float32Array(s.descriptor)])), MATCH_THRESHOLD) : null;
+        if (!matcher) {
+            setAiStatus('loading', 'AI พร้อม แต่ยังไม่มีนักเรียนลงทะเบียนใบหน้า (ไปที่ "ทะเบียนนักเรียน")');
+        } else {
+            setAiStatus('ready', `AI พร้อมใช้งาน (จำใบหน้าได้ ${valid.length} คน)`);
+        }
     }
 
     function switchTab(t) {
@@ -808,7 +862,6 @@ async function startVideo(vidId, detect) {
         if (placeholder) placeholder.classList.add('d-none');
 
         if (detect && isModelsLoaded) {
-            // เรียกทันทีหลัง play() สำเร็จ (ไม่ใช้ event 'play' เพราะ event มักยิงไปแล้วก่อนที่จะผูก listener ทัน ทำให้ canvas ไม่เคยถูกสร้าง)
             const setupFaceDetection = () => {
                 const oldCanvas = v.parentElement.querySelector('canvas');
                 if (oldCanvas) oldCanvas.remove();
@@ -816,10 +869,17 @@ async function startVideo(vidId, detect) {
                 const canvas = faceapi.createCanvasFromMedia(v);
                 v.parentElement.append(canvas);
 
-                const size = { width: v.clientWidth, height: v.clientHeight };
+                // ใช้ videoWidth/videoHeight (ขนาดจริงของวิดีโอ) เป็น fallback
+                // เผื่อ clientWidth/clientHeight ยังเป็น 0 ตอนที่ layout ยังไม่นิ่ง
+                const size = {
+                    width: v.clientWidth || v.videoWidth || 640,
+                    height: v.clientHeight || v.videoHeight || 480
+                };
                 faceapi.matchDimensions(canvas, size);
 
                 let isProcessing = false;
+                let consecutiveErrors = 0;
+                let errorShown = false;
 
                 const itv = setInterval(async () => {
                     if (v.paused || v.ended || (activeTab !== 'scan' && activeTab !== 'students')) {
@@ -840,6 +900,8 @@ async function startVideo(vidId, detect) {
                             .detectAllFaces(v, options)
                             .withFaceLandmarks()
                             .withFaceDescriptors();
+
+                        consecutiveErrors = 0;
 
                         const resized = faceapi.resizeResults(dets, size);
                         const ctx = canvas.getContext('2d');
@@ -887,7 +949,14 @@ async function startVideo(vidId, detect) {
                         }
 
                     } catch (frameErr) {
-                        console.log("Frame processing skip:", frameErr);
+                        console.error("Frame processing error:", frameErr);
+                        consecutiveErrors++;
+                        // ถ้า error ติดต่อกันหลายครั้ง แสดงว่ามีปัญหาจริง ไม่ใช่แค่เฟรมสะดุด -> แจ้งบนหน้าจอครั้งเดียว
+                        if (consecutiveErrors >= 10 && !errorShown) {
+                            errorShown = true;
+                            showPopup("ตรวจจับใบหน้าไม่ได้", frameErr.message || "เกิดข้อผิดพลาดระหว่างประมวลผล", "danger");
+                            setAiStatus('error', 'ตรวจจับใบหน้าล้มเหลวซ้ำๆ: ' + (frameErr.message || frameErr));
+                        }
                     } finally {
                         isProcessing = false;
                     }
@@ -895,8 +964,19 @@ async function startVideo(vidId, detect) {
                 }, 200);
             };
 
-            // เผื่อ browser บางตัวยังไม่ได้อัปเดต clientWidth/clientHeight ทันที ให้รอ requestAnimationFrame 1 รอบก่อน
-            requestAnimationFrame(() => setupFaceDetection());
+            // รอให้วิดีโอมีข้อมูลเฟรมจริงก่อน (readyState >= 2 คือ HAVE_CURRENT_DATA) ไม่ใช่แค่รอ 1 เฟรม
+            // ป้องกันปัญหา canvas ถูกสร้างตอนวิดีโอยังไม่มีขนาด/ข้อมูลจริง
+            const waitUntilVideoReady = (retriesLeft = 50) => {
+                if (v.readyState >= 2 && v.videoWidth > 0) {
+                    setupFaceDetection();
+                } else if (retriesLeft > 0) {
+                    requestAnimationFrame(() => waitUntilVideoReady(retriesLeft - 1));
+                } else {
+                    console.error("Video never became ready for face detection.");
+                    setAiStatus('error', 'วิดีโอไม่พร้อมสำหรับตรวจจับใบหน้า ลองรีเฟรชหน้าเว็บ');
+                }
+            };
+            waitUntilVideoReady();
         }
 
     } catch (e) {
